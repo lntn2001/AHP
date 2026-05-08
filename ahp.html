@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Hệ hỗ trợ quyết định lựa chọn quán ăn dựa trên AHP</title>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+<style>
+body{
+margin:0;
+font-family:Arial;
+background:#f4f7f6
+}
+
+/* HEADER */
+header{
+display:flex;
+align-items:center;
+justify-content:center;
+position:relative;
+background:#a8d5ba;
+padding:12px;
+font-weight:bold;
+font-size:18px;
+}
+
+header img{
+position:absolute;
+left:15px;
+height:40px
+}
+
+/* LAYOUT */
+.main{
+display:flex
+}
+
+/* SIDEBAR */
+.sidebar{
+width:260px;
+background:#e3f2ed;
+padding:15px;
+transition:0.3s;
+}
+
+.sidebar.hidden{
+width:0;
+padding:0;
+overflow:hidden;
+}
+
+/* CONTENT */
+.content{
+flex:1;
+padding:20px
+}
+
+.card{
+background:#fff;
+border-radius:12px;
+padding:15px;
+box-shadow:0 2px 5px rgba(0,0,0,0.08);
+}
+
+.slider-group{
+margin-bottom:15px
+}
+
+input[type=range]{
+width:100%
+}
+
+.value{
+font-size:12px;
+color:#666;
+text-align:right
+}
+
+/* BUTTON */
+button{
+background:#81c784;
+border:none;
+padding:8px 10px;
+margin:3px;
+border-radius:6px;
+cursor:pointer;
+}
+
+button:hover{
+background:#66bb6a
+}
+
+.primary{
+width:100%;
+margin-top:10px
+}
+
+/* TABLE */
+table{
+width:100%;
+border-collapse:collapse;
+margin-top:15px
+}
+
+th,td{
+border:1px solid #ddd;
+padding:6px;
+text-align:center;
+font-size:13px
+}
+
+th{
+background:#c8e6c9
+}
+
+.top1{
+background:#a5d6a7;
+font-weight:bold
+}
+
+.top3{
+background:#e8f5e9
+}
+</style>
+</head>
+
+<body>
+
+<header>
+<img src="LOGO.png">
+Hệ hỗ trợ quyết định lựa chọn quán ăn dựa trên AHP
+</header>
+
+<div class="main">
+
+<!-- SIDEBAR -->
+<div class="sidebar" id="sidebar">
+
+<div class="card" style="position:relative">
+
+<h3>Trọng số</h3>
+
+<button onclick="toggleSidebar()" 
+style="position:absolute;top:10px;right:10px;background:none;border:none;font-size:18px">
+☰
+</button>
+
+<div class="slider-group">
+Giá
+<input type="range" min="1" max="10" value="5" id="w1">
+<div class="value" id="v1"></div>
+</div>
+
+<div class="slider-group">
+Chất lượng
+<input type="range" min="1" max="10" value="5" id="w2">
+<div class="value" id="v2"></div>
+</div>
+
+<div class="slider-group">
+Độ đông
+<input type="range" min="1" max="10" value="5" id="w3">
+<div class="value" id="v3"></div>
+</div>
+
+<div class="slider-group">
+Khoảng cách
+<input type="range" min="1" max="10" value="5" id="w4">
+<div class="value" id="v4"></div>
+</div>
+
+<div>
+<button onclick="preset('cheap')">Ăn rẻ</button>
+<button onclick="preset('quality')">Ăn ngon</button>
+<button onclick="preset('near')">Gần nhất</button>
+<button onclick="preset('balance')">Cân bằng</button>
+</div>
+
+<button onclick="tinh()" class="primary">Tính</button>
+
+</div>
+</div>
+
+<!-- CONTENT -->
+<div class="content">
+
+<div class="card">
+<h3>Kết quả</h3>
+
+<table id="bang">
+
+<thead>
+<tr>
+<th>#</th>
+<th>Tên</th>
+<th>Phân loại</th>
+<th>Địa chỉ</th>
+<th>Mở</th>
+<th>Đóng</th>
+<th>Giá</th>
+<th>Rating</th>
+<th>Đông</th>
+<th>Km</th>
+<th>Điểm</th>
+</tr>
+</thead>
+
+<tbody></tbody>
+
+</table>
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+let data=[];
+
+/* LOAD EXCEL */
+fetch("data_100_quan.xlsx")
+.then(r=>r.arrayBuffer())
+.then(ab=>{
+
+let wb=XLSX.read(ab,{type:"array"});
+
+let json=XLSX.utils.sheet_to_json(
+wb.Sheets[wb.SheetNames[0]]
+);
+
+console.log(Object.keys(json[0]));
+
+data=json.map(x=>({
+
+ten: x["Tên quán"],
+
+phanloai: x["Phân loại món"] || x["Phân loại"] || "",
+
+diachi: x["Tên đường"] || x["Địa chỉ"] || "",
+
+mocua: x["Giờ mở cửa"] || "",
+
+dongcua: x["Giờ đóng cửa"] || "",
+
+gia:+x["Giá thấp nhất (VND)"],
+
+rating:+x["Rating (1-5)"],
+
+dong:+x["Độ đông (1-5)"],
+
+kc:+x["Khoảng cách (km)"]
+
+}));
+
+});
+
+/* SLIDER */
+["w1","w2","w3","w4"].forEach((id,i)=>{
+
+let el=document.getElementById(id);
+
+let v=document.getElementById("v"+(i+1));
+
+el.oninput=()=>v.innerHTML="Mức: "+el.value;
+
+el.oninput();
+
+});
+
+/* SIDEBAR */
+function toggleSidebar(){
+
+document
+.getElementById("sidebar")
+.classList.toggle("hidden");
+
+}
+
+/* PRESET */
+function preset(type){
+
+if(type==="cheap"){
+w1.value=10;
+w2.value=4;
+w3.value=5;
+w4.value=6;
+}
+
+if(type==="quality"){
+w1.value=4;
+w2.value=10;
+w3.value=5;
+w4.value=5;
+}
+
+if(type==="near"){
+w1.value=5;
+w2.value=5;
+w3.value=4;
+w4.value=10;
+}
+
+if(type==="balance"){
+w1.value=5;
+w2.value=5;
+w3.value=5;
+w4.value=5;
+}
+
+["w1","w2","w3","w4"].forEach((id,i)=>{
+
+document.getElementById("v"+(i+1)).innerHTML=
+"Mức: "+document.getElementById(id).value;
+
+});
+
+}
+
+/* AHP */
+function buildMatrix(w){
+
+let m=[];
+
+for(let i=0;i<4;i++){
+
+m[i]=[];
+
+for(let j=0;j<4;j++){
+
+m[i][j]=w[i]/w[j];
+
+}
+
+}
+
+return m;
+
+}
+
+function eigen(m){
+
+let w=[0.25,0.25,0.25,0.25];
+
+for(let k=0;k<50;k++){
+
+let w2=[0,0,0,0];
+
+for(let i=0;i<4;i++){
+
+for(let j=0;j<4;j++){
+
+w2[i]+=m[i][j]*w[j];
+
+}
+
+}
+
+let sum=w2.reduce((a,b)=>a+b,0);
+
+for(let i=0;i<4;i++){
+
+w2[i]/=sum;
+
+}
+
+w=w2;
+
+}
+
+return w;
+
+}
+
+function norm(arr,key,rev=false){
+
+let v=arr.map(x=>x[key]);
+
+let min=Math.min(...v);
+
+let max=Math.max(...v);
+
+return arr.map(x=>{
+
+let val=(x[key]-min)/(max-min||1);
+
+return rev?1-val:val;
+
+});
+
+}
+
+/* MAIN */
+function tinh(){
+
+let raw=[
++w1.value,
++w2.value,
++w3.value,
++w4.value
+];
+
+let sum=raw.reduce((a,b)=>a+b,0);
+
+let w=raw.map(x=>x/sum);
+
+let m=buildMatrix(w);
+
+w=eigen(m);
+
+let p=norm(data,"gia",true);
+
+let r=norm(data,"rating");
+
+let d=norm(data,"dong",true);
+
+let k=norm(data,"kc",true);
+
+let res=data.map((x,i)=>({
+...x,
+s:
+w[0]*p[i]+
+w[1]*r[i]+
+w[2]*d[i]+
+w[3]*k[i]
+}));
+
+res.sort((a,b)=>b.s-a.s);
+
+/* RENDER */
+let tb=document.querySelector("#bang tbody");
+
+tb.innerHTML="";
+
+res.forEach((x,i)=>{
+
+tb.innerHTML+=`
+<tr class="${i==0?'top1':i<3?'top3':''}">
+<td>${i+1}</td>
+<td>${x.ten}</td>
+<td>${x.phanloai}</td>
+<td>${x.diachi}</td>
+<td>${x.mocua}</td>
+<td>${x.dongcua}</td>
+<td>${x.gia}</td>
+<td>${x.rating}</td>
+<td>${x.dong}</td>
+<td>${x.kc}</td>
+<td><b>${x.s.toFixed(3)}</b></td>
+</tr>
+`;
+
+});
+
+}
+
+</script>
+
+</body>
+</html>
